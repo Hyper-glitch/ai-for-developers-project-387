@@ -1,0 +1,28 @@
+.idea/
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Node
+node_modules/
+
+# Local env
+.env
+.env.local
+.env.*
+!.env.example
+.codex/
+
+# Claude Code: skills are restored from skills-lock.json, local settings stay local
+.claude/skills/
+.claude/settings.local.json
+.claude/worktrees/
+.agents/
+
+# Playwright
+/e2e/test-results/
