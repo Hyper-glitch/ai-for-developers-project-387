@@ -48,6 +48,14 @@ docker run --rm -e PORT=8087 -p 127.0.0.1:8087:8087 booking-calendar
 
 Для деплоя на Railway используйте секцию `mcp_servers.railway` из того же шаблона и выполните `codex mcp login railway`. После входа попросите агента развернуть сервис из корневого Dockerfile и назначить публичный домен. [Подключение Railway MCP](https://docs.railway.com/ai/mcp-server).
 
+## OpenCode в GitHub Issues
+
+В новом комментарии к issue напишите `/oc explain this issue`. Команды вызова (параметр `mentions`) — `/oc` и `/opencode`. Пишите команду в начале комментария, а запрос отделяйте пробелом. Ответ появится в обсуждении задачи, журнал запуска — в [Actions → OpenCode](https://github.com/Hyper-glitch/ai-for-developers-project-387/actions/workflows/opencode.yml).
+
+Воркфлоу обрабатывает событие `issue_comment.created` в проекте 387 для авторов с ролью `OWNER`, `MEMBER` или `COLLABORATOR`. Комментарии ботов и обсуждения pull request пропускаются, включая PR из форков. Одновременно выполняется одна команда на репозиторий, до 10 минут. Если уже есть ожидающая команда, следующая заменяет её в очереди.
+
+Модель `openai/gpt-5.3-codex` получает ключ из секрета Actions `OPENAI_API_KEY`. Checkout читает репозиторий без сохранения учётных данных. OpenCode обменивает OIDC-токен на токен установленного GitHub App для ответа в issue. Параметр `share: false` отключает публикацию сессии OpenCode. [Настройка интеграции](https://opencode.ai/docs/github/) · [OpenCode GitHub App](https://github.com/apps/opencode-agent)
+
 ## Установка
 
 Нужен только [mise](https://mise.jdx.dev/) — остальные инструменты он ставит сам в версиях из `mise.toml`.

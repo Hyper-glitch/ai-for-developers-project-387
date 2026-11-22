@@ -12,6 +12,7 @@
 - `mise run lint` / `mise run typecheck` / `mise run test` — по отдельности.
 - `mise daemons start` / `status` / `logs api` / `stop` — бекенд (:8000) и фронтенд (:5173) в фоне.
 - `mise run dev:backend` / `mise run dev:frontend` — те же серверы в текущем терминале.
+- `mise run test:e2e` — отдельно проверить бронирование в Chromium.
 - Один тест: `cd backend && uv run pytest tests/test_smoke.py::test_health_returns_ok`; `cd frontend && npx vitest run src/api/health.test.ts`.
 
 ## Устройство
