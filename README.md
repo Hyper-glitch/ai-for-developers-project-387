@@ -51,6 +51,7 @@ docker run --rm -e PORT=8087 -p 127.0.0.1:8087:8087 booking-calendar
 ## OpenCode в GitHub Issues
 
 В новом комментарии к issue напишите `/oc explain this issue`. Команды вызова (параметр `mentions`) — `/oc` и `/opencode`. Пишите команду в начале комментария, а запрос отделяйте пробелом. Ответ появится в обсуждении задачи, журнал запуска — в [Actions → OpenCode](https://github.com/Hyper-glitch/ai-for-developers-project-387/actions/workflows/opencode.yml).
+Пример проверки настроек проекта: [проверенный ответ OpenCode](https://github.com/Hyper-glitch/ai-for-developers-project-387/issues/3#issuecomment-7083429363) · [успешный прогон](https://github.com/Hyper-glitch/ai-for-developers-project-387/actions/runs/45053690084).
 
 Воркфлоу обрабатывает событие `issue_comment.created` в проекте 387 для авторов с ролью `OWNER`, `MEMBER` или `COLLABORATOR`. Комментарии ботов и обсуждения pull request пропускаются, включая PR из форков. Одновременно выполняется одна команда на репозиторий, до 10 минут. Если уже есть ожидающая команда, следующая заменяет её в очереди.
 
