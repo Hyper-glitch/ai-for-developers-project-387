@@ -3,7 +3,7 @@ description: Install Matt Pocock's skills for OpenCode from the revision used in
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
         repository: mattpocock/skills
         ref: 4ae2317ddb22b046e26455e4f9c9b3aaaf62212d

@@ -22,11 +22,11 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - uses: ./.github/actions/restore-skills
-      - uses: anomalyco/opencode/github@latest
+      - uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENCODE_AUTH_CONTENT: ${{ secrets.OPENCODE_AUTH_CONTENT }}
