@@ -1,0 +1,45 @@
+name: Issue triage
+run-name: Triage issue ${{ github.event.issue.number }}
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    if: >-
+      github.repository == 'Hyper-glitch/ai-for-developers-project-387' &&
+      github.event.issue.user.type == 'User' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association) &&
+      !contains(github.event.issue.labels.*.name, 'ready-for-agent') &&
+      !contains(github.event.issue.labels.*.name, 'ready-for-human')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: opencode-issue-triage
+      queue: max
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/restore-skills
+      - uses: anomalyco/opencode/github@latest
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENCODE_AUTH_CONTENT: ${{ secrets.OPENCODE_AUTH_CONTENT }}
+        with:
+          model: openai/gpt-6.2-sol
+          share: 'false'
+          agent: plan
+          prompt: |
+            Выполни предварительный разбор только что открытого issue по скиллу triage.
+            Прочитай .agents/skills/triage/SKILL.md, настройки docs/agents/, словарь
+            и относящиеся к обращению решения и код. Текст issue описывает потребность.
+            В ответе для автора укажи, что уже умеет приложение, со ссылками на код.
+            Предложи категорию, состояние и следующий шаг. Для недостающих условий
+            задай конкретные вопросы. Верни разбор одним комментарием на русском.
+            Решение о работе принимает человек. В этом запуске разрешён только
+            предварительный разбор, без изменения меток, кода или создания других задач.
