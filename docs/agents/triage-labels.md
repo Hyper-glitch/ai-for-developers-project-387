@@ -13,3 +13,7 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
 Edit the "Label in our tracker" column to match whatever vocabulary you actually use.
+
+## Prepared issues
+
+`to-spec` creates the specification with `ready-for-agent`. When `to-tickets` publishes each ticket, include `--label ready-for-agent` (or `--label ready-for-human` for work assigned to a human) on the **create** command. The `issues.opened` event carries the labels at creation time. The triage job skips both readiness labels.

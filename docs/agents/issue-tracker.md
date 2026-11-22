@@ -2,6 +2,8 @@
 
 Issues and specs for this repo live as GitHub issues in `Hyper-glitch/ai-for-developers-project-387` (https://github.com/Hyper-glitch/ai-for-developers-project-387/issues). Use the `gh` CLI for all operations.
 
+When publishing a specification or prepared ticket, set its [readiness label](triage-labels.md#prepared-issues) in the same request that creates the issue.
+
 ## Conventions
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
