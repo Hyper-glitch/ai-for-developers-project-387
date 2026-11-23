@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0](https://github.com/Hyper-glitch/ai-for-developers-project-387/compare/v0.3.0...v0.4.0) (2026-11-23)
+
+
+### Features
+
+* добавить публичную тему разговора в бронирование ([#12](https://github.com/Hyper-glitch/ai-for-developers-project-387/issues/12)) ([925ea2c](https://github.com/Hyper-glitch/ai-for-developers-project-387/commit/925ea2c5fc11bd27af82b3ee23afa9152848674d))
+* открыть черновик для гостя из его бронирования ([#19](https://github.com/Hyper-glitch/ai-for-developers-project-387/issues/19)) ([d3d2e91](https://github.com/Hyper-glitch/ai-for-developers-project-387/commit/d3d2e919ae636694f55d4212ca8ad75fef6eb447)), closes [#10](https://github.com/Hyper-glitch/ai-for-developers-project-387/issues/10) [#18](https://github.com/Hyper-glitch/ai-for-developers-project-387/issues/18) [#20](https://github.com/Hyper-glitch/ai-for-developers-project-387/issues/20)
+* связать повторную находку аудита с исправлением ([#27](https://github.com/Hyper-glitch/ai-for-developers-project-387/issues/27)) ([fb5a4f4](https://github.com/Hyper-glitch/ai-for-developers-project-387/commit/fb5a4f4ebbc9d53cc0e3596bc7239bd4fe419d35))
+
+
+### Bug Fixes
+
+* выбрать доступную по подписке модель OpenCode ([bf826d3](https://github.com/Hyper-glitch/ai-for-developers-project-387/commit/bf826d35cf941105eb2369b3e216bc629a45a62a))
+* отложить загрузку форм календаря до открытия страницы ([#24](https://github.com/Hyper-glitch/ai-for-developers-project-387/issues/24)) ([c36af06](https://github.com/Hyper-glitch/ai-for-developers-project-387/commit/c36af064d71c0f5cd588e90c9f78b25dc885ff9d))
+
 ## [0.3.0](https://github.com/Hyper-glitch/ai-for-developers-project-386/compare/v0.2.0...v0.3.0) (2026-11-22)
 
 
