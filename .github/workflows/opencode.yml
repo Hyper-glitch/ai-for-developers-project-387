@@ -20,14 +20,25 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      issues: read
+      pull-requests: read
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - uses: ./.github/actions/restore-skills
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5
+        if: contains(github.event.comment.body, 'implement-spec')
+        with:
+          version: 2026.11.3
+        env:
+          MISE_NO_HOOKS: '1'
+      - run: mise run install
+        if: contains(github.event.comment.body, 'implement-spec')
       - uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a
         env:
+          GH_TOKEN: ${{ github.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENCODE_AUTH_CONTENT: ${{ secrets.OPENCODE_AUTH_CONTENT }}
         with:

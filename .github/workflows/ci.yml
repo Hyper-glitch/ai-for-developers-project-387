@@ -48,6 +48,7 @@ jobs:
         run: |
           actual=$(git rev-parse HEAD)
           echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          echo "results=$(mktemp -d "$RUNNER_TEMP/pr-browser.XXXXXXXX")" >> "$GITHUB_OUTPUT"
           echo "Checked out $actual"
           test "$actual" = "$EXPECTED_SHA"
       - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5
@@ -57,26 +58,55 @@ jobs:
       - name: Run Chromium against the PR head
         id: playwright
         env:
-          PLAYWRIGHT_JUNIT_OUTPUT_FILE: ${{ github.workspace }}/e2e/test-results/junit.xml
+          RESULTS: ${{ steps.checkout.outputs.results }}
         run: |
-          mise exec -- npm --prefix e2e test -- --trace=on --reporter=list,junit
-          test -s "$PLAYWRIGHT_JUNIT_OUTPUT_FILE"
-          test -n "$(find e2e/test-results -name trace.zip -type f -size +0c -print -quit)"
+          export PLAYWRIGHT_JUNIT_OUTPUT_FILE="$RESULTS/junit.xml"
+          mise exec -- e2e/node_modules/.bin/playwright test --config=e2e/playwright.config.ts \
+            --output="$RESULTS/traces" --trace=on --reporter=list,junit
+          mise exec -- python - "$RESULTS" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+          from xml.etree import ElementTree
+          from zipfile import ZipFile
+
+          results = Path(sys.argv[1]).resolve()
+          report = ElementTree.parse(results / "junit.xml")
+          passed = [case for case in report.iter("testcase") if case.find("skipped") is None]
+          if not passed or report.findall(".//failure") or report.findall(".//error"):
+              sys.exit("Expected at least one passing Chromium test and no failures")
+          for case in passed:
+              output = case.findtext("system-out", "")
+              attachment = re.search(r"\[\[ATTACHMENT\|(traces/[^\n]+/trace\.zip)\]\]", output)
+              if not attachment:
+                  sys.exit(f"No trace attached to {case.get('name')}")
+              path = (results / attachment[1]).resolve()
+              if not path.is_relative_to(results / "traces"):
+                  sys.exit("Trace attachment outside this run's output directory")
+              with ZipFile(path) as trace:
+                  if trace.testzip() or not any(
+                      entry.filename.endswith("-trace.trace") and entry.file_size
+                      for entry in trace.infolist()
+                  ):
+                      sys.exit(f"Missing or corrupt browser trace in {path}")
+          PY
       - name: Record SHA and result
-        if: always() && steps.checkout.outputs.sha != ''
+        if: always() && steps.checkout.outputs.results != ''
         env:
-          ACTUAL_SHA: ${{ steps.checkout.outputs.sha }}
+          RESULTS: ${{ steps.checkout.outputs.results }}
           OUTCOME: ${{ steps.playwright.outcome }}
         run: |
-          mkdir -p e2e/test-results
-          jq -n --arg sha "$ACTUAL_SHA" --arg outcome "$OUTCOME" \
+          actual=$(git rev-parse HEAD)
+          if [[ "$actual" != "$EXPECTED_SHA" ]]; then OUTCOME=failure; fi
+          jq -n --arg sha "$actual" --arg outcome "$OUTCOME" \
             --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" \
-            '{sha: $sha, playwright: $outcome, run: $run}' > e2e/test-results/result.json
-          cat e2e/test-results/result.json
+            '{sha: $sha, playwright: $outcome, run: $run}' > "$RESULTS/result.json"
+          cat "$RESULTS/result.json"
+          test "$actual" = "$EXPECTED_SHA"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always() && steps.checkout.outputs.sha != ''
+        if: always() && steps.checkout.outputs.results != ''
         with:
           name: browser-pr-${{ github.event.number }}-${{ steps.checkout.outputs.sha }}-${{ github.run_attempt }}
-          path: e2e/test-results/
+          path: ${{ steps.checkout.outputs.results }}/
           if-no-files-found: error
           retention-days: 30

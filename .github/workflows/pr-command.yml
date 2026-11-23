@@ -42,6 +42,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      issues: read
       pull-requests: read
       id-token: write
     outputs:
@@ -51,6 +52,7 @@ jobs:
         id: trust
         env:
           GH_TOKEN: ${{ github.token }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
         run: |
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
           if jq -e --arg repo "$GITHUB_REPOSITORY" '
@@ -59,11 +61,22 @@ jobs:
             and ((.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
                  or (.user.login | IN("opencode-agent[bot]", "github-actions[bot]")))
             ' "$RUNNER_TEMP/pr.json" > /dev/null; then
-            permission=$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$GITHUB_TRIGGERING_ACTOR/permission" --jq .permission)
-            if [[ "$permission" == write || "$permission" == admin ]]; then
-              echo "allowed=true" >> "$GITHUB_OUTPUT"
+            authors=("$COMMENT_AUTHOR")
+            if [[ "$GITHUB_TRIGGERING_ACTOR" != "$COMMENT_AUTHOR" ]]; then
+              authors+=("$GITHUB_TRIGGERING_ACTOR")
             fi
+            for author in "${authors[@]}"; do
+              permission=$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$author/permission" --jq .permission)
+              [[ "$permission" == write || "$permission" == admin ]] || exit 0
+            done
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # The budget reader can distinguish an access refusal from a timeout or
+      # cancellation by looking at this step in this specific attempt's jobs.
+      - name: Reject untrusted command
+        if: steps.trust.outputs.allowed != 'true'
+        run: echo 'PR or caller did not pass the trust check.'
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: steps.trust.outputs.allowed == 'true'
@@ -86,6 +99,16 @@ jobs:
       - uses: ./.github/actions/restore-skills
         if: steps.trust.outputs.allowed == 'true'
 
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5
+        if: steps.trust.outputs.allowed == 'true'
+        with:
+          version: 2026.11.3
+        env:
+          MISE_NO_HOOKS: '1'
+
+      - run: mise run install
+        if: steps.trust.outputs.allowed == 'true'
+
       - name: Prepare OpenCode
         if: steps.trust.outputs.allowed == 'true'
         timeout-minutes: 4
@@ -101,6 +124,7 @@ jobs:
         if: steps.trust.outputs.allowed == 'true'
         env:
           MODEL: openai/gpt-6.2-sol
+          GH_TOKEN: ${{ github.token }}
           MENTIONS: /oc,/opencode
           SHARE: 'false'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
