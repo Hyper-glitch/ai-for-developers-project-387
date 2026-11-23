@@ -96,7 +96,7 @@ jobs:
               and (.categories.performance.score | type == "number")
               and (.requestedUrl | split("?")[0] | split("#")[0] | sub("/$"; "")) == ($url | split("?")[0] | split("#")[0] | sub("/$"; ""))
               and any(.audits["network-requests"].details.items[]?;
-                .resourceType == "Document" and .url == $url and .statusCode >= 200 and .statusCode < 300))
+                .resourceType == "Document" and (.url | split("#")[0]) == ($url | split("#")[0]) and .statusCode >= 200 and .statusCode < 300))
           ' "$out/report.json" >/dev/null; then
             url=$(jq -r '.requestedUrl // empty' "$out/report.json" 2>/dev/null || true)
             time=$(jq -r '.fetchTime // empty' "$out/report.json" 2>/dev/null || true)
