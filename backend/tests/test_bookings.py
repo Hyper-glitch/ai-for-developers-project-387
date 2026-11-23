@@ -181,14 +181,17 @@ def test_ongoing_meeting_blocks_overlap(
 
 @pytest.mark.parametrize("start", ["09:45", "10:30"])
 def test_partial_overlap_returns_conflict(
-    client: TestClient, crossing_request: dict[str, str], start: str
+    client: TestClient, reserved_slot: Booking, crossing_request: dict[str, str], start: str
 ) -> None:
-    """Reject a different meeting type crossing either end of a booked interval."""
+    """An overlapping request leaves the original guest's booking intact."""
     response = client.post(
-        "/bookings", json=crossing_request | {"startAt": f"2026-11-03T{start}:00Z"}
+        "/bookings",
+        json=crossing_request | {"startAt": f"2026-11-03T{start}:00Z", "topic": "Hiring"},
     )
     assert response.status_code == 409
     assert Error.model_validate(response.json()).code == "conflict"
+    assert client.get("/bookings").json() == [reserved_slot.model_dump(mode="json")]
+    assert reserved_slot.topic == "Planning"
 
 
 def test_booking_returns_trimmed_topic(client: TestClient, booking_request: dict[str, str]) -> None:

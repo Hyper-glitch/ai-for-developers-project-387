@@ -66,18 +66,36 @@ it('блокирует повторную отправку и показывае
 it.each([
   ['conflict', 'Это время уже занято. Выберите другое.'],
   ['slot_unavailable', 'Это время больше недоступно. Выберите другое.'],
-] as const)('после %s сохраняет контакты и оставляет день открытым', async (code, message) => {
-  vi.mocked(createBooking).mockResolvedValue({ error: { code, message: 'diagnostic' } });
-  vi.mocked(listSlots).mockResolvedValueOnce([later]);
-  const user = await fillForm();
-  await user.click(screen.getByRole('button', { name: 'Забронировать' }));
-  expect(await screen.findByText(message)).toBeInTheDocument();
-  expect(screen.queryByLabelText('Имя')).toBeNull();
-  expect(screen.queryByRole('button', { name: '13:00' })).toBeNull();
-  await user.click(screen.getByRole('button', { name: '14:00', pressed: false }));
-  expect(screen.getByLabelText('Имя')).toHaveValue('Анна');
-  expect(screen.getByLabelText('Email')).toHaveValue('a@example.com');
-});
+] as const)(
+  'после %s бронирует другой слот с введёнными контактами и темой',
+  async (code, message) => {
+    const topic = 'План проекта';
+    vi.mocked(createBooking)
+      .mockResolvedValueOnce({ error: { code, message: 'diagnostic' } })
+      .mockResolvedValueOnce({ data: { ...booked, ...later, topic } });
+    vi.mocked(listSlots).mockResolvedValueOnce([later]);
+    const user = await fillForm();
+    await user.type(screen.getByLabelText('Тема разговора'), '  ' + topic + '  ');
+    await user.click(screen.getByRole('button', { name: 'Забронировать' }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Имя')).toBeNull();
+    expect(screen.queryByRole('button', { name: '13:00' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: '14:00', pressed: false }));
+    expect(screen.getByLabelText('Имя')).toHaveValue('Анна');
+    expect(screen.getByLabelText('Email')).toHaveValue('a@example.com');
+    expect(screen.getByLabelText('Тема разговора')).toHaveValue('  ' + topic + '  ');
+    await user.click(screen.getByRole('button', { name: 'Забронировать' }));
+    expect(createBooking).toHaveBeenNthCalledWith(2, {
+      meetingTypeId: booked.meetingTypeId,
+      startAt: later.startAt,
+      guestName: booked.guestName,
+      guestEmail: booked.guestEmail,
+      topic,
+    });
+    expect(await screen.findByRole('heading', { name: 'Бронирование подтверждено' })).toBeVisible();
+    expect(screen.getByText(/3 ноября.*14:00/)).toBeVisible();
+  },
+);
 
 it('ошибка обновления допускает повтор, опустевший день закрывается', async () => {
   vi.mocked(createBooking).mockResolvedValue({ error: { code: 'conflict', message: '' } });
