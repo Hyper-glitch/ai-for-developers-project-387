@@ -92,9 +92,9 @@ jobs:
           if [[ "$(cat "$out/mode.txt")" != live || -f "$out/unavailable.json" ]]; then exit 0; fi
           if ! jq -es '
             length == 1 and (.[0] |
-              .requestedUrl as $url | .runtimeError == null
+              .finalDisplayedUrl as $url | .runtimeError == null
               and (.categories.performance.score | type == "number")
-              and .finalDisplayedUrl == $url
+              and (.requestedUrl | sub("/$"; "")) == ($url | sub("/$"; ""))
               and any(.audits["network-requests"].details.items[]?;
                 .resourceType == "Document" and .url == $url and .statusCode >= 200 and .statusCode < 300))
           ' "$out/report.json" >/dev/null; then

@@ -39,7 +39,10 @@ function selectFinding(data, report, issueList) {
   if (failures.length > 1) {
     const comments = readComments();
     const histories = failures.map(check => ({ check, ...history(check, issueList, comments, data.measuredAt) }));
-    check = (histories.find(item => item.action === 'recur') ?? histories.find(item => !item.issue) ?? histories[0]).check;
+    const prior = [...issueList, ...comments].filter(item => item.user.login === 'github-actions[bot]');
+    const published = histories.find(({ check }) => prior.some(item =>
+      item.body?.includes(measurementMarker(check.key, data.measuredAt))));
+    check = (published ?? histories.find(item => item.action === 'recur') ?? histories.find(item => !item.issue) ?? histories[0]).check;
   }
   const selected = check && report.audits[check.id];
   data.finding = selected && {
@@ -49,6 +52,10 @@ function selectFinding(data, report, issueList) {
     metricSavings: selected.metricSavings,
   };
   data.marker = marker(fingerprint(data.url, data.training, check?.id ?? 'clean'));
+}
+
+function measurementMarker(key, measuredAt) {
+  return `<!-- calendar-measurement:${key}:${Date.parse(measuredAt)} -->`;
 }
 
 function prepare(reportPath, contextPath) {
@@ -157,7 +164,9 @@ function publish(contextPath, answerPath) {
   }
   if (data.training) lines.push('Учебный пример. Данные смоделированы для проверки автоматизации.');
   lines.push(`[Журнал запуска](${run}) · [Исходный отчёт](${process.env.ARTIFACT_URL})`);
-  const body = [...lines, data.marker].join('\n\n');
+  const markers = [data.marker];
+  if (data.finding) markers.unshift(measurementMarker(fingerprint(data.url, data.training, data.finding.id), data.measuredAt));
+  const body = [...lines, ...markers].join('\n\n');
   let result;
   if (existing) {
     result = `Такая находка уже зарегистрирована: ${existing.html_url}`;

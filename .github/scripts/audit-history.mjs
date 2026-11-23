@@ -52,7 +52,7 @@ export function transition({ issue, fix, measuredAt, observed, key, comments }) 
     .filter(line => line.startsWith(prefix) && line.endsWith(' -->'))
     .map(line => Date.parse(line.slice(prefix.length, -4)))
     .filter(time => time > afterFix);
-  if (observed === 'pass' && !recoveries.length) return 'record';
+  if (observed === 'pass' && !recoveries.some(time => time <= measured)) return 'record';
   if (observed === 'finding' && recoveries.some(time => measured > time)) return 'recur';
   return 'none';
 }

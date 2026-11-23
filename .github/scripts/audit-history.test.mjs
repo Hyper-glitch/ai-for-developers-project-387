@@ -17,6 +17,8 @@ test('a closed issue needs an actual fix and a measured recovery before a later 
   assert.equal(transition({ ...state, observed: 'pass', fix: null }), 'none');
   assert.equal(transition({ ...state, measuredAt: issue.closed_at, observed: 'pass' }), 'none');
   assert.equal(transition({ ...state, measuredAt: passedAt, observed: 'pass' }), 'record');
+  assert.equal(transition({ ...state, measuredAt: passedAt, observed: 'pass',
+    comments: [{ ...comment, body: recoveryMarker(key, fix.number, later) }] }), 'record');
   assert.equal(transition({ ...state, observed: 'pass', comments: [comment] }), 'none');
   assert.equal(transition({ ...state, comments: [comment] }), 'recur');
   assert.equal(transition({ ...state, measuredAt: passedAt, comments: [comment] }), 'none');
