@@ -131,8 +131,11 @@ dir = "e2e"
 run = "npm test"
 
 [tasks.test]
-description = "Run backend and frontend tests"
-depends = ["test:backend", "test:frontend"]
+description = "Run backend, frontend and PR command budget tests"
+depends = ["test:backend", "test:frontend", "test:pr-budget"]
+
+[tasks."test:pr-budget"]
+run = "node --test .github/scripts/pr-budget.test.mjs"
 
 [tasks."gen:verify"]
 description = "Fail if generated files are out of date with the TypeSpec contract"
