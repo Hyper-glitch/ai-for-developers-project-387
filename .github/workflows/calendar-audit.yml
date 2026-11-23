@@ -62,10 +62,15 @@ jobs:
         if: inputs.source_run_id == '' && !inputs.training
         run: |
           [[ "$APP_URL" == https://* ]]
+          out="$RUNNER_TEMP/calendar-audit"
+          status=0
           mise exec -- npm exec --yes --package=lighthouse@13.6.0 -- lighthouse "$APP_URL" \
             --only-categories=performance --chrome-flags='--headless --disable-dev-shm-usage' \
-            --output=json --output-path="$RUNNER_TEMP/calendar-audit/report.json"
-          jq -e '(.runtimeError == null) and (.categories.performance.score | type == "number") and (.audits["http-status-code"].score != 0)' "$RUNNER_TEMP/calendar-audit/report.json"
+            --output=json --output-path="$out/report.json" || status=$?
+          if (( status != 0 )) || [[ ! -s "$out/report.json" ]]; then
+            jq -n --arg url "$APP_URL" --arg time "$(date -u +%FT%TZ)" --argjson status "$status" \
+              '{url:$url, measuredAt:$time, exitCode:$status, reason:"Lighthouse не смог завершить измерение."}' > "$out/unavailable.json"
+          fi
           echo live > "$RUNNER_TEMP/calendar-audit/mode.txt"
 
       - name: Prepare an explicitly synthetic measurement
@@ -80,6 +85,24 @@ jobs:
               details:{overallSavingsBytes:184320}}}
           }' > "$RUNNER_TEMP/calendar-audit/report.json"
           echo training > "$RUNNER_TEMP/calendar-audit/mode.txt"
+
+      - name: Verify the document in fresh and restored reports
+        run: |
+          out="$RUNNER_TEMP/calendar-audit"
+          if [[ "$(cat "$out/mode.txt")" != live || -f "$out/unavailable.json" ]]; then exit 0; fi
+          if ! jq -es '
+            length == 1 and (.[0] |
+              .finalDisplayedUrl as $url | .runtimeError == null
+              and (.categories.performance.score | type == "number")
+              and (.requestedUrl | split("?")[0] | split("#")[0] | sub("/$"; "")) == ($url | split("?")[0] | split("#")[0] | sub("/$"; ""))
+              and any(.audits["network-requests"].details.items[]?;
+                .resourceType == "Document" and (.url | split("#")[0]) == ($url | split("#")[0]) and .statusCode >= 200 and .statusCode < 300))
+          ' "$out/report.json" >/dev/null; then
+            url=$(jq -r '.requestedUrl // empty' "$out/report.json" 2>/dev/null || true)
+            time=$(jq -r '.fetchTime // empty' "$out/report.json" 2>/dev/null || true)
+            jq -n --arg url "${url:-$APP_URL}" --arg time "${time:-Время замера неизвестно}" \
+              '{url:$url, measuredAt:$time, reason:"Не удалось подтвердить успешную загрузку проверяемой страницы и получить измерение Lighthouse."}' > "$out/unavailable.json"
+          fi
 
       - id: upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -97,6 +120,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
     env:
       MISE_NO_HOOKS: '1'
       AUDIT_LOG_ISSUE: '22'
@@ -114,9 +138,15 @@ jobs:
           path: ${{ runner.temp }}/calendar-audit
 
       - name: Prepare verified measurements and prior issues for OpenCode
+        id: measurement
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          directory="$RUNNER_TEMP/calendar-audit"
+          if [[ -f "$directory/unavailable.json" ]]; then
+            cp "$directory/unavailable.json" "$RUNNER_TEMP/unavailable.json"
+            exit 0
+          fi
           case "$(cat "$RUNNER_TEMP/calendar-audit/mode.txt")" in
             training) export AUDIT_DEMO=true ;;
             live) export AUDIT_DEMO=false ;;
@@ -124,8 +154,34 @@ jobs:
           esac
           mise exec -- node .github/scripts/calendar-audit.mjs prepare \
             "$RUNNER_TEMP/calendar-audit/report.json" "$RUNNER_TEMP/context.json" > "$RUNNER_TEMP/prompt.txt"
+          if jq -e '.noData == true' "$RUNNER_TEMP/context.json" >/dev/null; then
+            jq '{url, measuredAt, reason:"В отчёте отсутствуют пригодные для сравнения измерения."}' "$RUNNER_TEMP/context.json" > "$RUNNER_TEMP/unavailable.json"
+          else
+            echo 'ok=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record unavailable measurement
+        if: steps.measurement.outputs.ok != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_URL: ${{ needs.collect.outputs.artifact_url }}
+        run: |
+          file="$RUNNER_TEMP/unavailable.json"
+          marker="<!-- calendar-no-data:$(sha256sum "$file" | cut -d' ' -f1) -->"
+          {
+            jq -r '"**Нет данных Lighthouse** · " + .url + "\n\n" + .measuredAt + ". " + .reason' "$file"
+            echo "Состояние находок сохранено. [Запуск]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) · [Отчёт]($ARTIFACT_URL)"
+            echo "$marker"
+          } > "$RUNNER_TEMP/no-data.md"
+          cat "$RUNNER_TEMP/no-data.md" >> "$GITHUB_STEP_SUMMARY"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$AUDIT_LOG_ISSUE/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | .body' > "$RUNNER_TEMP/journal.txt"
+          if ! grep -Fq "$marker" "$RUNNER_TEMP/journal.txt"; then
+            gh issue comment "$AUDIT_LOG_ISSUE" --body-file "$RUNNER_TEMP/no-data.md"
+          fi
 
       - name: Install OpenCode CLI
+        if: steps.measurement.outputs.ok == 'true'
         working-directory: ${{ runner.temp }}
         run: |
           curl --fail --silent --show-error --location --retry 3 \
@@ -134,6 +190,7 @@ jobs:
           tar -xzf opencode.tar.gz opencode
 
       - name: Analyze the report
+        if: steps.measurement.outputs.ok == 'true'
         working-directory: ${{ runner.temp }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -155,6 +212,7 @@ jobs:
             ../events.jsonl > ../answer.txt
 
       - name: Record the conclusion and create a new issue when needed
+        if: steps.measurement.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_URL: ${{ needs.collect.outputs.artifact_url }}
