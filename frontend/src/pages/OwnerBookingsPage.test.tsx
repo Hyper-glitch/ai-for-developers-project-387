@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { listBookings, listMeetingTypes } from '../api';
 import { renderAt } from '../test/render';
@@ -24,6 +24,15 @@ it('показывает московские дату и время, тип и 
       endAt: '2026-11-03T21:45:00Z',
       guestName: 'Анна',
       guestEmail: 'anna@example.com',
+      topic: 'План встречи',
+    },
+    {
+      id: 'another',
+      meetingTypeId: 'intro',
+      startAt: '2026-11-04T09:00:00Z',
+      endAt: '2026-11-04T09:30:00Z',
+      guestName: 'Иван',
+      guestEmail: 'ivan@example.com',
     },
   ]);
   vi.mocked(listMeetingTypes).mockResolvedValue([
@@ -31,7 +40,10 @@ it('показывает московские дату и время, тип и 
     { id: 'intro', title: 'Знакомство', description: '', durationMinutes: 30 },
   ]);
   renderAt('/owner/bookings');
-  expect(await screen.findByRole('heading', { name: 'Знакомство' })).toBeInTheDocument();
+  const [first, second] = await screen.findAllByRole('article');
+  expect(within(first).getByRole('heading', { name: 'Знакомство' })).toBeVisible();
+  expect(within(first).getByText('Тема разговора: План встречи')).toBeVisible();
+  expect(within(second).queryByText(/Тема разговора/)).toBeNull();
   expect(screen.getByText(/4 ноября.*00:15/)).toBeInTheDocument();
   expect(screen.getByText('Анна')).toBeInTheDocument();
   expect(screen.getByText('anna@example.com')).toBeInTheDocument();

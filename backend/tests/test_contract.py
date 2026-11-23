@@ -42,3 +42,16 @@ def test_invalid_encoding_reports_body_error(client: TestClient, path: str) -> N
     error = Error.model_validate(response.json())
     assert error.code == "validation_error"
     assert error.fields and [item.field for item in error.fields] == [""]
+
+
+def test_booking_topic_contract() -> None:
+    """Clients can send padded topics and leave the topic out entirely."""
+    contract = yaml.safe_load((Path(__file__).parents[2] / "openapi/openapi.yaml").read_text())
+    schemas = contract["components"]["schemas"]
+    request = schemas["CreateBooking"]
+    topic = request["properties"]["topic"]
+    assert topic["type"] == "string"
+    assert "topic" not in request["required"]
+    assert "maxLength" not in topic
+    assert {"$ref": "#/components/schemas/CreateBooking"} in schemas["Booking"]["allOf"]
+    assert "topic" not in schemas["Booking"]["required"]

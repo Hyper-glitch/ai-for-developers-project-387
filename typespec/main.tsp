@@ -75,6 +75,8 @@ model CreateBooking {
   startAt: utcDateTime;
   @minLength(1) @maxLength(100) guestName: string;
   @format("email") guestEmail: string;
+  /** Public single-line conversation topic, up to 200 characters after trimming surrounding whitespace. Blank means omitted. */
+  topic?: string;
 }
 
 model Booking extends CreateBooking {

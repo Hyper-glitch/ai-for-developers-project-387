@@ -53,7 +53,7 @@ def upcoming(
 @pytest.fixture
 def reserved_slot(client: TestClient, booking_request: dict[str, str]) -> Booking:
     """Occupy 10:00 to 10:45 UTC on the owner's shared schedule."""
-    response = client.post("/bookings", json=booking_request)
+    response = client.post("/bookings", json=booking_request | {"topic": "Planning"})
     assert response.status_code == 201
     return Booking.model_validate(response.json())
 

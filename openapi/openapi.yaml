@@ -203,6 +203,9 @@ components:
         guestEmail:
           type: string
           format: email
+        topic:
+          type: string
+          description: Public single-line conversation topic, up to 200 characters after trimming surrounding whitespace. Blank means omitted.
     CreateMeetingType:
       type: object
       required:
