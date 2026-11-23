@@ -132,7 +132,10 @@ run = "npm test"
 
 [tasks.test]
 description = "Run backend, frontend and PR command budget tests"
-depends = ["test:backend", "test:frontend", "test:pr-budget"]
+depends = ["test:backend", "test:frontend", "test:pr-budget", "test:audit-history"]
+
+[tasks."test:audit-history"]
+run = "node --test .github/scripts/audit-history.test.mjs"
 
 [tasks."test:pr-budget"]
 run = "node --test .github/scripts/pr-budget.test.mjs"
