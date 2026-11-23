@@ -30,7 +30,7 @@ jobs:
         run: |
           container=$(docker run -d -e PORT=8087 -p 127.0.0.1:8087:8087 booking-calendar)
           trap 'docker logs "$container"; docker rm -f "$container"' EXIT
-          status=$(curl --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+          status=$(curl --silent --show-error --retry 10 --retry-all-errors --retry-delay 1 \
             --max-time 5 --output "$RUNNER_TEMP/home.html" --write-out '%{http_code}' http://127.0.0.1:8087/)
           echo "GET / on port 8087 returned HTTP $status"
           test "$status" = 200
