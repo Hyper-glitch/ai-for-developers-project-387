@@ -1,0 +1,162 @@
+name: Calendar Lighthouse audit
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Replay the saved report from this successful audit run'
+        type: string
+        required: false
+      training:
+        description: 'Use an explicitly synthetic report for a training issue'
+        type: boolean
+        default: false
+
+concurrency:
+  group: calendar-lighthouse-audit
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  collect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+    env:
+      APP_URL: ${{ vars.APP_URL }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      TRAINING: ${{ inputs.training }}
+      MISE_NO_HOOKS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: mkdir "$RUNNER_TEMP/calendar-audit"
+
+      - name: Restore the original measurement
+        if: inputs.source_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ && "$TRAINING" != true ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" |
+            jq -e '.path == ".github/workflows/calendar-audit.yml" and .head_branch == "main" and .conclusion == "success" and (.event == "schedule" or .event == "workflow_dispatch")'
+          gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name lighthouse-report --dir "$RUNNER_TEMP/calendar-audit"
+
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5
+        if: inputs.source_run_id == '' && !inputs.training
+        with:
+          version: 2026.11.3
+          install_args: node
+
+      - name: Measure the deployed calendar in Chrome
+        if: inputs.source_run_id == '' && !inputs.training
+        run: |
+          [[ "$APP_URL" == https://* ]]
+          mise exec -- npm exec --yes --package=lighthouse@13.6.0 -- lighthouse "$APP_URL" \
+            --only-categories=performance --chrome-flags='--headless --disable-dev-shm-usage' \
+            --output=json --output-path="$RUNNER_TEMP/calendar-audit/report.json"
+          jq -e '(.runtimeError == null) and (.categories.performance.score | type == "number") and (.audits["http-status-code"].score != 0)' "$RUNNER_TEMP/calendar-audit/report.json"
+          echo live > "$RUNNER_TEMP/calendar-audit/mode.txt"
+
+      - name: Prepare an explicitly synthetic measurement
+        if: inputs.source_run_id == '' && inputs.training
+        run: |
+          [[ "$APP_URL" == https://* ]]
+          jq -n --arg url "$APP_URL" --arg time "$(date -u +%FT%TZ)" '{
+            auditTraining:true, requestedUrl:$url, finalDisplayedUrl:$url, finalUrl:$url,
+            fetchTime:$time, lighthouseVersion:"training-fixture", categories:{performance:{score:0.54}},
+            audits:{"unused-javascript":{id:"unused-javascript", title:"Reduce unused JavaScript",
+              score:0, scoreDisplayMode:"metricSavings", displayValue:"Est savings of 180 KiB",
+              details:{overallSavingsBytes:184320}}}
+          }' > "$RUNNER_TEMP/calendar-audit/report.json"
+          echo training > "$RUNNER_TEMP/calendar-audit/mode.txt"
+
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lighthouse-report
+          path: ${{ runner.temp }}/calendar-audit/
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+  analyze:
+    needs: collect
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      issues: write
+    env:
+      MISE_NO_HOOKS: '1'
+      AUDIT_LOG_ISSUE: '22'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5
+        with:
+          version: 2026.11.3
+          install_args: node
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: lighthouse-report
+          path: ${{ runner.temp }}/calendar-audit
+
+      - name: Prepare verified measurements and prior issues for OpenCode
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$(cat "$RUNNER_TEMP/calendar-audit/mode.txt")" in
+            training) export AUDIT_DEMO=true ;;
+            live) export AUDIT_DEMO=false ;;
+            *) exit 1 ;;
+          esac
+          mise exec -- node .github/scripts/calendar-audit.mjs prepare \
+            "$RUNNER_TEMP/calendar-audit/report.json" "$RUNNER_TEMP/context.json" > "$RUNNER_TEMP/prompt.txt"
+
+      - name: Install OpenCode CLI
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            -o opencode.tar.gz https://github.com/anomalyco/opencode/releases/download/v1.19.6/opencode-linux-x64.tar.gz
+          echo '47734e08968b30cc22a0bffb6d9feeed76ad4aa743213a12122040392d09a057  opencode.tar.gz' | sha256sum --check
+          tar -xzf opencode.tar.gz opencode
+
+      - name: Analyze the report
+        working-directory: ${{ runner.temp }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENCODE_AUTH_CONTENT: ${{ secrets.OPENCODE_AUTH_CONTENT }}
+          OPENCODE_CONFIG_CONTENT: '{"permission":{"*":"deny"},"agent":{"auditor":{"mode":"primary","description":"Read supplied Lighthouse measurements","permission":{"*":"deny"}}}}'
+        run: |
+          [[ -n "$OPENAI_API_KEY" || -n "$OPENCODE_AUTH_CONTENT" ]]
+          mkdir audit-session
+          cd audit-session
+          status=0
+          timeout --kill-after=10s 6m ../opencode run --agent auditor --model openai/gpt-6.2-sol --format json \
+            < ../prompt.txt > ../events.jsonl || status=$?
+          if (( status != 0 )); then
+            jq -rc 'select(.type == "error") | {type, name:.error.name, statusCode:.error.data.statusCode}' ../events.jsonl
+            exit "$status"
+          fi
+          jq -ers 'if any(.[]; .type == "error") then error("OpenCode model error")
+            else [.[] | select(.type == "text") | .part.text] | join("\n") | select(test("\\S")) end' \
+            ../events.jsonl > ../answer.txt
+
+      - name: Record the conclusion and create a new issue when needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_URL: ${{ needs.collect.outputs.artifact_url }}
+        run: |
+          mise exec -- node .github/scripts/calendar-audit.mjs publish "$RUNNER_TEMP/context.json" "$RUNNER_TEMP/answer.txt"
