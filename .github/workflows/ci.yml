@@ -17,6 +17,25 @@ env:
   MISE_NO_HOOKS: "1"
 
 jobs:
+  docker:
+    name: Docker homepage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: docker build -t booking-calendar .
+      - name: Check the homepage on the configured port
+        run: |
+          container=$(docker run -d -e PORT=8087 -p 127.0.0.1:8087:8087 booking-calendar)
+          trap 'docker logs "$container"; docker rm -f "$container"' EXIT
+          status=$(curl --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+            --max-time 5 --output "$RUNNER_TEMP/home.html" --write-out '%{http_code}' http://127.0.0.1:8087/)
+          echo "GET / on port 8087 returned HTTP $status"
+          test "$status" = 200
+          grep -F '<title>Запись на звонок</title>' "$RUNNER_TEMP/home.html"
+
   check:
     name: ${{ github.event_name == 'pull_request' && 'PR checks' || 'Branch checks' }}
     runs-on: ubuntu-latest
