@@ -94,7 +94,7 @@ jobs:
             length == 1 and (.[0] |
               .finalDisplayedUrl as $url | .runtimeError == null
               and (.categories.performance.score | type == "number")
-              and (.requestedUrl | sub("/$"; "")) == ($url | sub("/$"; ""))
+              and (.requestedUrl | split("?")[0] | split("#")[0] | sub("/$"; "")) == ($url | split("?")[0] | split("#")[0] | sub("/$"; ""))
               and any(.audits["network-requests"].details.items[]?;
                 .resourceType == "Document" and .url == $url and .statusCode >= 200 and .statusCode < 300))
           ' "$out/report.json" >/dev/null; then

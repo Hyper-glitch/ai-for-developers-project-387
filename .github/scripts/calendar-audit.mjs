@@ -41,8 +41,9 @@ function selectFinding(data, report, issueList) {
     const histories = failures.map(check => ({ check, ...history(check, issueList, comments, data.measuredAt) }));
     const prior = [...issueList, ...comments].filter(item => item.user.login === 'github-actions[bot]');
     const published = histories.find(({ check }) => prior.some(item =>
-      item.body?.includes(measurementMarker(check.key, data.measuredAt))));
-    check = (published ?? histories.find(item => item.action === 'recur') ?? histories.find(item => !item.issue) ?? histories[0]).check;
+      item.body?.includes(measurementMarker(check.key, data.measuredAt)) ||
+      (item.body?.trimEnd().endsWith(marker(check.key)) && item.body.includes(`Замер ${data.measuredAt}, Lighthouse `))));
+    check = (published ?? histories.find(item => item.action === 'recur') ?? histories[0]).check;
   }
   const selected = check && report.audits[check.id];
   data.finding = selected && {
