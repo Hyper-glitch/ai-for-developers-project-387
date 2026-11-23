@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('владелец видит встречу, которую гость забронировал в каталоге', async ({ page }) => {
   const title = 'Знакомство';
+  const topic = 'План первой встречи';
   await page.goto('/');
   await page.getByRole('link', { name: 'Владельцу' }).click();
   await expect(page).toHaveURL(/\/owner\/bookings$/);
@@ -27,6 +28,7 @@ test('владелец видит встречу, которую гость за
   let time = await selectFirstSlot();
   await page.getByLabel('Имя').fill('Анна');
   await page.getByLabel('Email').fill('anna@example.com');
+  await page.getByLabel('Тема разговора').fill(topic);
   await page.getByRole('button', { name: 'Забронировать' }).click();
   const confirmed = page.getByRole('heading', { name: 'Бронирование подтверждено' });
   const expired = page.getByText('Это время больше недоступно. Выберите другое.', { exact: true });
@@ -49,4 +51,5 @@ test('владелец видит встречу, которую гость за
   await expect(booking.getByText(dateAndTime, { exact: true })).toBeVisible();
   await expect(booking.getByText('Анна', { exact: true })).toBeVisible();
   await expect(booking.getByText('anna@example.com')).toBeVisible();
+  await expect(booking.getByText(topic, { exact: false })).toBeVisible();
 });

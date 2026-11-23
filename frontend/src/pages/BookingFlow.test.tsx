@@ -132,3 +132,29 @@ it('связывает подсказки сервера с полями фор�
   expect(screen.getByLabelText('Email')).toHaveAccessibleDescription('Исправьте email');
   expect(screen.getByLabelText('Имя')).toHaveAccessibleDescription('Введите имя');
 });
+
+it('предупреждает о публичности и принимает 200 символов без крайних пробелов', async () => {
+  const topic = '💬'.repeat(200);
+  vi.mocked(createBooking).mockResolvedValue({ data: { ...booked, topic } });
+  const user = await fillForm();
+  const input = screen.getByLabelText('Тема разговора');
+  expect(input).toHaveAccessibleDescription(
+    /все, кто откроет страницу владельца\. Вход не требуется/i,
+  );
+  await user.click(input);
+  await user.paste('  ' + topic + '  ');
+  await user.click(screen.getByRole('button', { name: 'Забронировать' }));
+  expect(createBooking).toHaveBeenCalledWith(expect.objectContaining({ topic }));
+  expect(await screen.findByRole('heading', { name: 'Бронирование подтверждено' })).toBeVisible();
+  expect(screen.queryByText(topic, { exact: false })).toBeNull();
+});
+
+it('показывает ошибку у темы из 201 символа', async () => {
+  const user = await fillForm();
+  const input = screen.getByLabelText('Тема разговора');
+  await user.click(input);
+  await user.paste(' ' + 'я'.repeat(201) + ' ');
+  await user.click(screen.getByRole('button', { name: 'Забронировать' }));
+  expect(input).toHaveAccessibleDescription(/не больше 200 символов/i);
+  expect(createBooking).not.toHaveBeenCalled();
+});

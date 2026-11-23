@@ -15,6 +15,12 @@ class CreateBooking(BaseModel):
     startAt: AwareDatetime
     guestName: Annotated[str, Field(max_length=100, min_length=1)]
     guestEmail: EmailStr
+    topic: Annotated[
+        str | None,
+        Field(
+            description='Public single-line conversation topic, up to 200 characters after trimming surrounding whitespace. Blank means omitted.'
+        ),
+    ] = None
 
 
 class DurationMinutes(Enum):

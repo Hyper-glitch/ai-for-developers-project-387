@@ -189,3 +189,44 @@ def test_partial_overlap_returns_conflict(
     )
     assert response.status_code == 409
     assert Error.model_validate(response.json()).code == "conflict"
+
+
+def test_booking_returns_trimmed_topic(client: TestClient, booking_request: dict[str, str]) -> None:
+    """A guest can use all 200 characters even with surrounding spaces."""
+    response = client.post("/bookings", json=booking_request | {"topic": "  " + "💬" * 200 + "  "})
+    assert response.status_code == 201
+    assert response.json()["topic"] == "💬" * 200
+    assert client.get("/bookings").json() == [response.json()]
+
+
+@pytest.mark.parametrize("topic", [{}, {"topic": ""}, {"topic": "  "}])
+def test_booking_omits_absent_topic(
+    client: TestClient, booking_request: dict[str, str], topic: dict[str, str]
+) -> None:
+    """Guests can leave the topic blank and still appear on the owner's list."""
+    response = client.post("/bookings", json=booking_request | topic)
+    assert response.status_code == 201
+    assert "topic" not in response.json()
+    assert client.get("/bookings").json() == [response.json()]
+
+
+def test_long_topic_leaves_slot_free(client: TestClient, booking_request: dict[str, str]) -> None:
+    """A topic over the limit gets field feedback without reserving the slot."""
+    response = client.post("/bookings", json=booking_request | {"topic": " " + "x" * 201 + " "})
+    assert response.status_code == 422
+    error = Error.model_validate(response.json())
+    assert error.code == "validation_error"
+    assert error.fields and [item.field for item in error.fields] == ["topic"]
+    assert client.get("/bookings").json() == []
+
+
+@pytest.mark.parametrize("topic", ["first\nsecond", "first\rsecond", "first\u2028second", None])
+def test_invalid_topic_returns_field_error(
+    client: TestClient, booking_request: dict[str, str], topic: str | None
+) -> None:
+    """Only a single line of text can become the public conversation topic."""
+    response = client.post("/bookings", json=booking_request | {"topic": topic})
+    assert response.status_code == 422
+    error = Error.model_validate(response.json())
+    assert error.fields and [item.field for item in error.fields] == ["topic"]
+    assert client.get("/bookings").json() == []

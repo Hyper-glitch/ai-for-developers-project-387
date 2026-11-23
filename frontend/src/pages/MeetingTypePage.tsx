@@ -32,6 +32,7 @@ function AvailabilityPage({ id }: { id: string }) {
 
   const [guestName, setName] = useState('');
   const [guestEmail, setEmail] = useState('');
+  const [topic, setTopic] = useState('');
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<Booking>();
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -40,15 +41,21 @@ function AvailabilityPage({ id }: { id: string }) {
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
-    setPending(true);
-    setFields({});
     setNotice('');
+    const normalizedTopic = topic.trim();
+    if ([...normalizedTopic].length > 200) {
+      setFields({ topic: 'Введите не больше 200 символов' });
+      return;
+    }
+    setFields({});
+    setPending(true);
     try {
       const result = await createBooking({
         meetingTypeId: id,
         startAt: start,
         guestName,
         guestEmail,
+        ...(normalizedTopic && { topic: normalizedTopic }),
       });
       if (result.data) {
         setConfirmation(result.data);
@@ -68,7 +75,7 @@ function AvailabilityPage({ id }: { id: string }) {
         setState({ kind: 'missing' });
       } else if (code === 'validation_error' && fields?.length) {
         setFields(Object.fromEntries(fields.map(({ field, message }) => [field, message])));
-        if (fields.some(({ field }) => field !== 'guestName' && field !== 'guestEmail'))
+        if (fields.some(({ field }) => !['guestName', 'guestEmail', 'topic'].includes(field)))
           setNotice('Не удалось забронировать время');
       } else {
         setNotice('Не удалось забронировать время');
@@ -192,6 +199,14 @@ function AvailabilityPage({ id }: { id: string }) {
                   value={guestEmail}
                   error={fields.guestEmail}
                   onChange={(e) => setEmail(e.currentTarget.value)}
+                />
+                <TextInput
+                  label="Тема разговора"
+                  description="Тему разговора смогут увидеть все, кто откроет страницу владельца. Вход не требуется."
+                  disabled={pending}
+                  value={topic}
+                  error={fields.topic}
+                  onChange={(e) => setTopic(e.currentTarget.value)}
                 />
                 <Button type="submit" loading={pending} disabled={pending}>
                   Забронировать

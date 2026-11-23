@@ -24,10 +24,23 @@ router = APIRouter(tags=["bookings"])
 
 
 class BookingInput(CreateBooking):
-    """Normalize contact details before checking their constraints."""
+    """Normalize guest input before checking the booking constraints."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
     _submicrosecond: bool = PrivateAttr(default=False)
+
+    @field_validator("topic", mode="before")
+    @classmethod
+    def normalize_topic(cls, raw: object) -> str | None:
+        """Count only the characters the owner will see."""
+        if not isinstance(raw, str):
+            raise ValueError("Expected a conversation topic as a string")
+        topic = raw.strip()
+        if len(topic) > 200:
+            raise ValueError("Введите не больше 200 символов")
+        if len(topic.splitlines()) > 1:
+            raise ValueError("Введите тему одной строкой")
+        return topic or None
 
     @field_validator("startAt", mode="before")
     @classmethod
@@ -56,6 +69,7 @@ class BookingInput(CreateBooking):
     operation_id="Bookings_create",
     status_code=201,
     response_model=Booking,
+    response_model_exclude_none=True,
     responses={code: {"model": Error} for code in (404, 409, 422)},
 )
 def create_booking(
@@ -84,7 +98,7 @@ def create_booking(
     return booking
 
 
-@router.get("/bookings", operation_id="Bookings_list")
+@router.get("/bookings", operation_id="Bookings_list", response_model_exclude_none=True)
 def list_bookings(
     store: Annotated[Store, Depends(get_store)],
     now: Annotated[datetime, Depends(get_now)],

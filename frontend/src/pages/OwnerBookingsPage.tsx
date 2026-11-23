@@ -45,6 +45,7 @@ export function OwnerBookingsPage() {
           </Text>
           <Text>{booking.guestName}</Text>
           <Text>{booking.guestEmail}</Text>
+          {booking.topic && <Text>Тема разговора: {booking.topic}</Text>}
         </Paper>
       ))}
       {failed && <Text role="alert">Не удалось загрузить бронирования</Text>}

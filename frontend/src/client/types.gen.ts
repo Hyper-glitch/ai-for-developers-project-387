@@ -14,6 +14,10 @@ export type CreateBooking = {
     startAt: string;
     guestName: string;
     guestEmail: string;
+    /**
+     * Public single-line conversation topic, up to 200 characters after trimming surrounding whitespace. Blank means omitted.
+     */
+    topic?: string;
 };
 
 export type CreateMeetingType = {
