@@ -32,27 +32,16 @@ test('владелец видит бронирования из каталога
   async function bookGuest({ name, email, topic }: { name: string; email: string; topic: string }) {
     await page.getByRole('link', { name: title }).click();
     const days = page.getByRole('group', { name: 'Дни для записи' });
+    // The first enabled day may be today, with a slot about to expire.
+    await days.getByRole('button', { disabled: false }).nth(1).click();
     const slot = page.getByRole('group', { name: 'Время начала' }).getByRole('button').first();
-    async function selectFirstSlot() {
-      await days.getByRole('button', { disabled: false }).first().click();
-      const start = await slot.innerText();
-      await slot.click();
-      return start;
-    }
-    let time = await selectFirstSlot();
+    const time = await slot.innerText();
+    await slot.click();
     await page.getByLabel('Имя').fill(name);
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Тема разговора').fill(topic);
     await page.getByRole('button', { name: 'Забронировать' }).click();
     const confirmed = page.getByRole('heading', { name: 'Бронирование подтверждено' });
-    const expired = page.getByText('Это время больше недоступно. Выберите другое.', { exact: true });
-    await expect(confirmed.or(expired)).toBeVisible();
-    if (await expired.isVisible()) {
-      time = await selectFirstSlot();
-      await expect(page.getByLabel('Имя')).toHaveValue(name);
-      await expect(page.getByLabel('Email')).toHaveValue(email);
-      await page.getByRole('button', { name: 'Забронировать' }).click();
-    }
     await expect(confirmed).toBeVisible();
     await expect(page.getByText(title, { exact: true })).toBeVisible();
     await expect(page.getByText(email, { exact: true })).toBeVisible();
