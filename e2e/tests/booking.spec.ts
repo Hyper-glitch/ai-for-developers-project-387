@@ -29,18 +29,47 @@ test('владелец видит бронирования из каталога
 
   await page.getByRole('link', { name: 'Запись на звонок' }).click();
   await page.getByRole('link', { name: 'Записаться', exact: true }).first().click();
-  async function bookGuest({ name, email, topic }: { name: string; email: string; topic: string }) {
+  async function bookGuest(
+    { name, email, topic }: { name: string; email: string; topic: string },
+    { rejectFirstSlot = false } = {},
+  ) {
     await page.getByRole('link', { name: title }).click();
     const days = page.getByRole('group', { name: 'Дни для записи' });
     // The first enabled day may be today, with a slot about to expire.
     await days.getByRole('button', { disabled: false }).nth(1).click();
-    const slot = page.getByRole('group', { name: 'Время начала' }).getByRole('button').first();
-    const time = await slot.innerText();
-    await slot.click();
+    const slots = page.getByRole('group', { name: 'Время начала' }).getByRole('button');
+    let time = await slots.first().innerText();
+    await slots.first().click();
     await page.getByLabel('Имя').fill(name);
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Тема разговора').fill(topic);
-    await page.getByRole('button', { name: 'Забронировать' }).click();
+    const submit = page.getByRole('button', { name: 'Забронировать' });
+    if (rejectFirstSlot) {
+      await page.route(
+        (url) => url.pathname === '/bookings',
+        async (route) => {
+          expect(route.request().method()).toBe('POST');
+          await route.fulfill({
+            status: 422,
+            json: { code: 'slot_unavailable', message: 'Slot unavailable', reason: 'past' },
+          });
+        },
+        { times: 1 },
+      );
+
+      await submit.click();
+      await expect(page.getByRole('alert')).toHaveText(
+        'Это время больше недоступно. Выберите другое.',
+      );
+      await expect(submit).toBeHidden();
+      const replacement = slots.nth(1);
+      time = await replacement.innerText();
+      await replacement.click();
+      await expect(page.getByLabel('Имя')).toHaveValue(name);
+      await expect(page.getByLabel('Email')).toHaveValue(email);
+      await expect(page.getByLabel('Тема разговора')).toHaveValue(topic);
+    }
+    await submit.click();
     const confirmed = page.getByRole('heading', { name: 'Бронирование подтверждено' });
     await expect(confirmed).toBeVisible();
     await expect(page.getByText(title, { exact: true })).toBeVisible();
@@ -50,7 +79,7 @@ test('владелец видит бронирования из каталога
 
   const annaDateAndTime = await bookGuest(anna);
   await page.getByRole('link', { name: 'Записаться ещё' }).click();
-  const borisDateAndTime = await bookGuest(boris);
+  const borisDateAndTime = await bookGuest(boris, { rejectFirstSlot: true });
 
   await page.getByRole('link', { name: 'Владельцу' }).click();
   for (const { name, email, topic, href, dateAndTime } of [
