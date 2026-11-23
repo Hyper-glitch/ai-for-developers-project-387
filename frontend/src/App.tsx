@@ -1,14 +1,22 @@
 import { Anchor, Box, Container, Group, Stack } from '@mantine/core';
+import { lazy, Suspense } from 'react';
 import { Link, Navigate, Outlet, Route, Routes } from 'react-router';
 
 import { CatalogPage } from './pages/CatalogPage';
 import { HomePage } from './pages/HomePage';
-import { MeetingTypePage } from './pages/MeetingTypePage';
 
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OwnerBookingsPage } from './pages/OwnerBookingsPage';
-import { OwnerMeetingTypesPage } from './pages/OwnerMeetingTypesPage';
 import { paths } from './paths';
+
+const MeetingTypePage = lazy(() =>
+  import('./pages/MeetingTypePage').then((module) => ({ default: module.MeetingTypePage })),
+);
+const OwnerMeetingTypesPage = lazy(() =>
+  import('./pages/OwnerMeetingTypesPage').then((module) => ({
+    default: module.OwnerMeetingTypesPage,
+  })),
+);
 
 function Layout() {
   return (
@@ -30,7 +38,9 @@ function Layout() {
         </Container>
       </Box>
       <Container component="main" size="sm" py="xl">
-        <Outlet />
+        <Suspense fallback={<span role="status">Загрузка…</span>}>
+          <Outlet />
+        </Suspense>
       </Container>
     </>
   );
