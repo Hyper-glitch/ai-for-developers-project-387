@@ -1,8 +1,15 @@
-import { Paper, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Paper, Stack, Text, Title } from '@mantine/core';
 import { useEffect, useState } from 'react';
 
 import { listBookings, listMeetingTypes, type Booking } from '../api';
 import { ownerDate, ownerTime } from './ownerTime';
+
+function guestMailto(email: string) {
+  const at = email.lastIndexOf('@');
+  const local = encodeURIComponent(email.slice(0, at));
+  const domain = encodeURIComponent(email.slice(at + 1));
+  return `mailto:${local}@${domain}`;
+}
 
 export function OwnerBookingsPage() {
   const [rows, setRows] = useState<(Booking & { title: string })[]>();
@@ -44,7 +51,9 @@ export function OwnerBookingsPage() {
             {ownerDate(booking.startAt)}, {ownerTime(booking.startAt)}
           </Text>
           <Text>{booking.guestName}</Text>
-          <Text>{booking.guestEmail}</Text>
+          <Text>
+            <Anchor href={guestMailto(booking.guestEmail)}>{booking.guestEmail}</Anchor>
+          </Text>
           {booking.topic && <Text>Тема разговора: {booking.topic}</Text>}
         </Paper>
       ))}
