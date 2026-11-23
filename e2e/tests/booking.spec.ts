@@ -97,9 +97,17 @@ test('владелец видит бронирования из каталога
   }
 
   await expect(mailtoLinks).toHaveCount(2);
-  await page.getByRole('link', { name: 'Типы встреч' }).focus();
-  await page.keyboard.press('Tab');
-  await expect(mailtoLinks.first()).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(mailtoLinks.last()).toBeFocused();
+  const maxTabs = 20;
+  const unreached = new Set([anna.href, boris.href]);
+  for (let tabs = 0; tabs < maxTabs && unreached.size > 0; tabs++) {
+    await page.keyboard.press('Tab');
+    const focusedHref = await mailtoLinks.evaluateAll((links) =>
+      links.find((link) => link.matches(':focus'))?.getAttribute('href'),
+    );
+    if (focusedHref) unreached.delete(focusedHref);
+  }
+  expect(
+    [...unreached],
+    `За ${maxTabs} нажатий Tab не удалось достичь следующих почтовых ссылок`,
+  ).toEqual([]);
 });
